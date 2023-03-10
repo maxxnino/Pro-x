@@ -1,15 +1,15 @@
 #!/bin/sh
 random() {
-        tr </dev/urandom -dc A-Za-z0-9 | head -c5
-        echo
+	tr </dev/urandom -dc A-Za-z0-9 | head -c5
+	echo
 }
 
 array=(1 2 3 4 5 6 7 8 9 0 a b c d e f)
 gen64() {
-        ip64() {
-                echo "${array[$RANDOM % 16]}${array[$RANDOM % 16]}${array[$RANDOM % 16]}${array[$RANDOM % 16]}"
-        }
-        echo "$1:$(ip64):$(ip64):$(ip64):$(ip64)"
+	ip64() {
+		echo "${array[$RANDOM % 16]}${array[$RANDOM % 16]}${array[$RANDOM % 16]}${array[$RANDOM % 16]}"
+	}
+	echo "$1:$(ip64):$(ip64):$(ip64):$(ip64)"
 }
 install_3proxy() {
     echo "installing 3proxy"
@@ -52,103 +52,84 @@ nscache 65536
 timeouts 1 5 30 60 180 1800 15 60
 setgid 65535
 setuid 65535
-stacksize 6291456
+stacksize 6291456 
 flush
-auth $Auth
-users $(awk -F "|" 'BEGIN{ORS="";} {print $1 ":CL:" $2 " "}' ${WORKDATA})
-$(awk -F "|" '{print "auth " $3"\n" \
+auth strong
+users $(awk -F "/" 'BEGIN{ORS="";} {print $1 ":CL:" $2 " "}' ${WORKDATA})
+$(awk -F "/" '{print "auth none\n" \
 "allow " $1 "\n" \
-"proxy -6 -n -a -p" $6 " -i" $5 " -e"$7"\n" \
+"proxy -6 -n -a -p" $5 " -i" $4 " -e"$6"\n" \
 "flush\n"}' ${WORKDATA})
 EOF
 }
 
 gen_proxy_file_for_user() {
-    cat >/root/proxylist.txt <<EOF
-$(awk -F "|" '{print $5 ":" $6}' ${WORKDATA})
+    cat >proxy.txt <<EOF
+$(awk -F "/" '{print $4 ":" $5}' ${WORKDATA})
 EOF
 }
 
 upload_proxy() {
     cd $WORKDIR
-    local PASS1=$(random)
-    zip --password $PASS1 proxy.zip /root/proxylist.txt
+    local PASS=$(random)
+    zip --password $PASS proxy.zip proxy.txt
     URL=$(curl -F "file=@proxy.zip" https://file.io)
 
-    echo "Proxy is ready! Format IP:PORT:LOGIN:PASS1"
+    echo "Proxy is ready! Format IP:PORT:LOGIN:PASS"
     echo "Download zip archive from: ${URL}"
-    echo "Password: ${PASS1}"
+    echo "Password: ${PASS}"
 
 }
 gen_data() {
     seq $FIRST_PORT $LAST_PORT | while read port; do
-        echo "$User|$Pass|$Auth|$interface|$IP4|$port|$(gen64 $IP6)|$Prefix"
+        echo "bintechproxy/bintechpass/$interface/$IP4/$port/$(gen64 $IP6)"
     done
 }
 
 gen_iptables() {
     cat <<EOF
-    $(awk -F "|" '{print "/sbin/iptables -I INPUT -p tcp --dport " $6 "  -m state --state NEW -j ACCEPT"}' ${WORKDATA})
+    $(awk -F "/" '{print "iptables -I INPUT -p tcp --dport " $5 "  -m state --state NEW -j ACCEPT"}' ${WORKDATA}) 
 EOF
 }
 
 gen_ifconfig() {
     cat <<EOF
-$(awk -F "|" '{print "/sbin/ifconfig " $4 " inet6 add " $7"/"$8}' ${WORKDATA})
+$(awk -F "/" '{print "ifconfig " $3 " inet6 add " $6 "/64"}' ${WORKDATA})
 EOF
 }
-ulimit -n 65535
-/bin/pkill -f '/usr/local/etc/3proxy/bin/3proxy /usr/local/etc/3proxy/3proxy.cfg'
-/bin/pkill -f 'dhclient'
-sleep 5
-#/sbin/service network restart
-#/sbin/iptables -F INPUT
-
 echo "installing apps"
-rm -fv /usr/local/etc/3proxy/3proxy.cfg
-rm -fv /home/proxy-installer/data.txt
-rm -fv /home/proxy-installer/boot_iptables.sh
-rm -fv /home/proxy-installer/boot_ifconfig.sh
+yum -y install gcc net-tools bsdtar zip make >/dev/null
+
+install_3proxy
+
 echo "working folder = /home/proxy-installer"
 WORKDIR="/home/proxy-installer"
 WORKDATA="${WORKDIR}/data.txt"
-WORKDATA2="${WORKDIR}/ipv6-subnet.txt"
+mkdir $WORKDIR && cd $_
 
 IP4=$(curl -4 -s icanhazip.com)
-IP6=$(awk -F "|" '{print $1}' ${WORKDATA2})
-Prefix=$(awk -F "|" '{print $2}' ${WORKDATA2})
-User=$(awk -F "|" '{print $3}' ${WORKDATA2})
-Pass=$(awk -F "|" '{print $4}' ${WORKDATA2})
-interface=$(awk -F "|" '{print $5}' ${WORKDATA2})
-Auth=$(awk -F "|" '{print $6}' ${WORKDATA2})
-#FIRST_PORT=$(awk -F "|" '{print $7}' ${WORKDATA2})
-#LAST_PORT=$(awk -F "|" '{print $7}' ${WORKDATA2})
-FIRST_PORT=30000
-LAST_PORT=35249
-
-systemctl restart network
-systemctl start NetworkManager.service
-/sbin/ifup ${interface}
-sed -i 's/127.0.0.1/8.8.8.8/g' /etc/resolv.conf
+IP6=$(curl -6 -s icanhazip.com | cut -f1-4 -d':')
+interface=$(ip addr show | awk '/inet.*brd/{print $NF}')
 
 echo "Internal ip = ${IP4}. Exteranl sub for ip6 = ${IP6}"
 
+FIRST_PORT=30000
+LAST_PORT=31079
+
 gen_data >$WORKDIR/data.txt
+gen_iptables >$WORKDIR/boot_iptables.sh
 gen_ifconfig >$WORKDIR/boot_ifconfig.sh
 chmod +x $WORKDIR/boot_*.sh /etc/rc.local
 
 gen_3proxy >/usr/local/etc/3proxy/3proxy.cfg
 
-rm -fv /etc/rc.local
-
 cat >>/etc/rc.local <<EOF
-touch /var/lock/subsys/local
 systemctl start NetworkManager.service
-/bin/pkill -f 'dhclient'
-/sbin/ifup ${interface}
+ifup ${interface}
+bash ${WORKDIR}/boot_iptables.sh
 bash ${WORKDIR}/boot_ifconfig.sh
 ulimit -n 65535
-//usr/local/etc/3proxy/bin/3proxy /usr/local/etc/3proxy/3proxy.cfg &
+/usr/local/etc/3proxy/bin/3proxy /usr/local/etc/3proxy/3proxy.cfg &
 EOF
 
 bash /etc/rc.local
