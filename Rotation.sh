@@ -69,8 +69,8 @@ IP6=$(curl -6 -s icanhazip.com | cut -f1-4 -d':')
 interface=$(ip addr show | awk '/inet.*brd/{print $NF}')
 echo "Internal ip = ${IP4}. Exteranl sub for ip6 = ${IP6}"
 
-FIRST_PORT=40000
-LAST_PORT=40499
+FIRST_PORT=30000
+LAST_PORT=30499
 
 gen_data >$WORKDIR/data.txt
 #gen_iptables >$WORKDIR/boot_iptables.sh
