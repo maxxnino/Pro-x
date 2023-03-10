@@ -56,7 +56,7 @@ stacksize 6291456
 flush
 auth strong
 users $(awk -F "|" 'BEGIN{ORS="";} {print $1 ":CL:" $2 " "}' ${WORKDATA})
-$(awk -F "|" '{print "auth " $3"\n" \
+$(awk -F "|" '{print "auth none\n" \
 "allow " $1 "\n" \
 "proxy -6 -n -a -p" $6 " -i" $5 " -e"$7"\n" \
 "flush\n"}' ${WORKDATA})
@@ -126,7 +126,7 @@ interface=eth0
 #        * ) echo "Please answer yes or no.";;
 #    esac
 #done
-Auth=strong
+Auth=none
 User=MKproxy
 Pass=MKpasswd
 
