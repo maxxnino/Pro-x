@@ -114,7 +114,7 @@ interface=$(ip addr show | awk '/inet.*brd/{print $NF}')
 echo "Internal ip = ${IP4}. Exteranl sub for ip6 = ${IP6}"
 
 FIRST_PORT=30000
-LAST_PORT=33079
+LAST_PORT=32079
 
 gen_data >$WORKDIR/data.txt
 gen_iptables >$WORKDIR/boot_iptables.sh
