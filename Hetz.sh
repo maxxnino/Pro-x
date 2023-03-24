@@ -43,7 +43,7 @@ install_3proxy() {
 gen_3proxy() {
     cat <<EOF
 daemon
-maxconn 3000
+maxconn 5000
 nserver 1.1.1.1
 nserver 1.0.0.1
 nserver 2606:4700:4700::64
