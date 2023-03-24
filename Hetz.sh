@@ -43,7 +43,7 @@ install_3proxy() {
 gen_3proxy() {
     cat <<EOF
 daemon
-maxconn 5000
+maxconn 3000
 nserver 1.1.1.1
 nserver 1.0.0.1
 nserver 2606:4700:4700::64
@@ -133,7 +133,7 @@ Pass=MKpasswd
 #read -p "Please input start port :" FIRST_PORT
 #read -p "Please input start port :" LAST_PORT
 FIRST_PORT=30000
-LAST_PORT=35000
+LAST_PORT=33000
 
 rm -fv $WORKDIR/ipv6-subnet.txt
 cat >>$WORKDIR/ipv6-subnet.txt <<EOF
