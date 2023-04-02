@@ -65,7 +65,7 @@ EOF
 
 gen_proxy_file_for_user() {
     cat >/root/proxylist.txt <<EOF
-$(awk -F "|" '{print $5 ":" $6}' ${WORKDATA})
+$(awk -F "|" '{print $5 ":" $6 ":" $1 ":" $2 }' ${WORKDATA})
 EOF
 }
 
