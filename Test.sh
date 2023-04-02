@@ -21,7 +21,7 @@ install_3proxy() {
     make -f Makefile.Linux
     mkdir -p /usr/local/etc/3proxy/{bin,logs,stat}
     mv /3proxy/3proxy-0.9.3/bin/3proxy /usr/local/etc/3proxy/bin/
-    wget https://raw.githubusercontent.com/minhchau91/Proxy_ipv6/main/3proxy.service-Centos8 --output-document=/3proxy/3proxy-0.9.3/scripts/3proxy.service2
+    wget https://raw.githubusercontent.com/bintechvn/Pro-x/main/3proxy.service-Centos8 --output-document=/3proxy/3proxy-0.9.3/scripts/3proxy.service2
     cp /3proxy/3proxy-0.9.3/scripts/3proxy.service2 /usr/lib/systemd/system/3proxy.service
     systemctl link /usr/lib/systemd/system/3proxy.service
     systemctl daemon-reload
@@ -65,7 +65,7 @@ EOF
 
 gen_proxy_file_for_user() {
     cat >/root/proxylist.txt <<EOF
-$(awk -F "|" '{print $5 ":" $6}' ${WORKDATA})
+$(awk -F "|" '{print $5 ":" $6 ":" $1 ":" $2 }' ${WORKDATA})
 EOF
 }
 
@@ -106,16 +106,34 @@ WORKDATA="${WORKDIR}/data.txt"
 mkdir $WORKDIR && cd $_
 
 IP4=$(curl -4 -s icanhazip.com)
-IP6=$(curl -6 -s icanhazip.com | cut -f1-4 -d':')
-interface=enp2s0
-
-Auth=strong
-User=mcproxy
-Pass=mcproxy2023
+checkIP6=$(curl -6 -s icanhazip.com | cut -f1-4 -d':')
+#IP6=$(curl -6 -s icanhazip.com | cut -f1-4 -d':')
+echo "Detected your ipv4: $IP4" 
+echo "Detected your ipv6: $checkIP6" 
+#read -p "What is your ipv6 prefix? (exp: /56, /64): " Prefix
 Prefix=64
+read -p "What is your ipv6 subnet? (exp: 2600:3c00:e002:6d00): " IP6
+#checkinterface=$(ip addr show | awk '/inet.*brd/{print $NF}')
+echo "Detected your active interface: $checkinterface"
+#read -p "Please confirm your active network interface : " interface
+interface=eth0
 
-FIRST_PORT=40000
-LAST_PORT=41099
+#while true; do
+#    read -p "Do you want to create auth for your proxy? (Y/N): " authConfirm
+#    case $authConfirm in
+#        [Yy]* ) Auth=strong; read -p "Input UserName? " User; read -p "Input PassWord: " Pass; break;;
+#        [Nn]* ) Auth=none;User=minhchau; Pass=minhchau@123; break;;
+#        * ) echo "Please answer yes or no.";;
+#    esac
+#done
+Auth=strong
+User=MKproxy
+Pass=MKpasswd
+
+#read -p "Please input start port :" FIRST_PORT
+#read -p "Please input start port :" LAST_PORT
+FIRST_PORT=30000
+LAST_PORT=33000
 
 rm -fv $WORKDIR/ipv6-subnet.txt
 cat >>$WORKDIR/ipv6-subnet.txt <<EOF
@@ -149,13 +167,4 @@ bash /etc/rc.local
 
 gen_proxy_file_for_user
 
-wget "https://raw.githubusercontent.com/minhchau91/createproxy/main/Rotation.sh" --output-document=/root/Rotation.sh
-chmod 777 /root/Rotation.sh
-cat >>/var/spool/cron/root<<EOF
-#day - time
-#59 7 * * * /root/Rotation.sh > /root/Rotation_log.txt
-#minutes
-*/5 * * * * /root/Rotation.sh > /root/Rotation_log.txt
-#hour
-#0 * * * * /root/Rotation.sh > /root/Rotation_log.txt
-EOF
+upload_proxy
