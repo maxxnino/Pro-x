@@ -54,9 +54,9 @@ setgid 65535
 setuid 65535
 stacksize 6291456 
 flush
-auth strong
+auth $Auth
 users $(awk -F "/" 'BEGIN{ORS="";} {print $1 ":CL:" $2 " "}' ${WORKDATA})
-$(awk -F "/" '{print "auth none\n" \
+$(awk -F "|" '{print "auth " $3"\n" \
 "allow " $1 "\n" \
 "proxy -6 -n -a -p" $5 " -i" $4 " -e"$6"\n" \
 "flush\n"}' ${WORKDATA})
@@ -65,7 +65,7 @@ EOF
 
 gen_proxy_file_for_user() {
     cat >proxy.txt <<EOF
-$(awk -F "/" '{print $4 ":" $5}' ${WORKDATA})
+$(awk -F "|" '{print $5 ":" $6 ":" $1 ":" $2 }' ${WORKDATA})
 EOF
 }
 
@@ -82,7 +82,7 @@ upload_proxy() {
 }
 gen_data() {
     seq $FIRST_PORT $LAST_PORT | while read port; do
-        echo "bintechproxy/bintechpass/$interface/$IP4/$port/$(gen64 $IP6)"
+        echo "$User|$Pass|$Auth|$interface|$IP4|$port|$(gen64 $IP6)|$Prefix"
     done
 }
 
@@ -113,8 +113,17 @@ interface=$(ip addr show | awk '/inet.*brd/{print $NF}')
 
 echo "Internal ip = ${IP4}. Exteranl sub for ip6 = ${IP6}"
 
+Auth=strong
+User=mcproxy
+Pass=mcproxy2023
+
 FIRST_PORT=30000
 LAST_PORT=31000
+
+rm -fv $WORKDIR/ipv6-subnet.txt
+cat >>$WORKDIR/ipv6-subnet.txt <<EOF
+${IP6}|${Prefix}|${User}|${Pass}|${interface}|${Auth}
+EOF
 
 gen_data >$WORKDIR/data.txt
 gen_iptables >$WORKDIR/boot_iptables.sh
