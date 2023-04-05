@@ -26,34 +26,56 @@ setgid 65535
 setuid 65535
 stacksize 6291456
 flush
-auth none
-users $(awk -F "/" 'BEGIN{ORS="";} {print $1 ":CL:" $2 " "}' ${WORKDATA})
-$(awk -F "/" '{print "auth none\n" \
+auth $Auth
+users $(awk -F "|" 'BEGIN{ORS="";} {print $1 ":CL:" $2 " "}' ${WORKDATA})
+$(awk -F "|" '{print "auth " $3"\n" \
 "allow " $1 "\n" \
-"proxy -6 -n -a -p" $5 " -i" $4 " -e"$6"\n" \
+"proxy -6 -n -a -p" $6 " -i" $5 " -e"$7"\n" \
 "flush\n"}' ${WORKDATA})
 EOF
 }
 
+gen_proxy_file_for_user() {
+    cat >/root/proxylist.txt <<EOF
+$(awk -F "|" '{print $5 ":" $6}' ${WORKDATA})
+EOF
+}
+
+upload_proxy() {
+    cd $WORKDIR
+    local PASS1=$(random)
+    zip --password $PASS1 proxy.zip /root/proxylist.txt
+    URL=$(curl -F "file=@proxy.zip" https://file.io)
+
+    echo "Proxy is ready! Format IP:PORT:LOGIN:PASS1"
+    echo "Download zip archive from: ${URL}"
+    echo "Password: ${PASS1}"
+
+}
 gen_data() {
     seq $FIRST_PORT $LAST_PORT | while read port; do
-        echo "mcdn/huladeca112/$interface/$IP4/$port/$(gen64 $IP6)"
+        echo "$User|$Pass|$Auth|$interface|$IP4|$port|$(gen64 $IP6)|$Prefix"
     done
 }
 
 gen_iptables() {
     cat <<EOF
-    $(awk -F "/" '{print "/sbin/iptables -I INPUT -p tcp --dport " $5 "  -m state --state NEW -j ACCEPT"}' ${WORKDATA})
+    $(awk -F "|" '{print "/sbin/iptables -I INPUT -p tcp --dport " $6 "  -m state --state NEW -j ACCEPT"}' ${WORKDATA})
 EOF
 }
 
 gen_ifconfig() {
     cat <<EOF
-$(awk -F "/" '{print "/sbin/ifconfig " $3 " inet6 add " $6 "/64"}' ${WORKDATA})
+$(awk -F "|" '{print "/sbin/ifconfig " $4 " inet6 add " $7"/"$8}' ${WORKDATA})
 EOF
 }
-/sbin/service network restart
+ulimit -n 65535
+/bin/pkill -f '/usr/local/etc/3proxy/bin/3proxy /usr/local/etc/3proxy/3proxy.cfg'
+/bin/pkill -f 'dhclient'
+sleep 5
+#/sbin/service network restart
 #/sbin/iptables -F INPUT
+
 echo "installing apps"
 rm -fv /usr/local/etc/3proxy/3proxy.cfg
 rm -fv /home/proxy-installer/data.txt
@@ -62,18 +84,28 @@ rm -fv /home/proxy-installer/boot_ifconfig.sh
 echo "working folder = /home/proxy-installer"
 WORKDIR="/home/proxy-installer"
 WORKDATA="${WORKDIR}/data.txt"
-#mkdir $WORKDIR && cd $_
+WORKDATA2="${WORKDIR}/ipv6-subnet.txt"
 
 IP4=$(curl -4 -s icanhazip.com)
-IP6=$(curl -6 -s icanhazip.com | cut -f1-4 -d':')
-interface=$(ip addr show | awk '/inet.*brd/{print $NF}')
-echo "Internal ip = ${IP4}. Exteranl sub for ip6 = ${IP6}"
-
+IP6=$(awk -F "|" '{print $1}' ${WORKDATA2})
+Prefix=$(awk -F "|" '{print $2}' ${WORKDATA2})
+User=$(awk -F "|" '{print $3}' ${WORKDATA2})
+Pass=$(awk -F "|" '{print $4}' ${WORKDATA2})
+interface=$(awk -F "|" '{print $5}' ${WORKDATA2})
+Auth=$(awk -F "|" '{print $6}' ${WORKDATA2})
+#FIRST_PORT=$(awk -F "|" '{print $7}' ${WORKDATA2})
+#LAST_PORT=$(awk -F "|" '{print $7}' ${WORKDATA2})
 FIRST_PORT=30000
 LAST_PORT=32000
 
+systemctl restart network
+systemctl start NetworkManager.service
+/sbin/ifup ${interface}
+sed -i 's/127.0.0.1/8.8.8.8/g' /etc/resolv.conf
+
+echo "Internal ip = ${IP4}. Exteranl sub for ip6 = ${IP6}"
+
 gen_data >$WORKDIR/data.txt
-#gen_iptables >$WORKDIR/boot_iptables.sh
 gen_ifconfig >$WORKDIR/boot_ifconfig.sh
 chmod +x $WORKDIR/boot_*.sh /etc/rc.local
 
@@ -84,11 +116,13 @@ rm -fv /etc/rc.local
 cat >>/etc/rc.local <<EOF
 touch /var/lock/subsys/local
 systemctl start NetworkManager.service
-ifup ${interface}
+/bin/pkill -f 'dhclient'
+/sbin/ifup ${interface}
 bash ${WORKDIR}/boot_ifconfig.sh
 ulimit -n 65535
+/bin/pkill -f '/usr/local/etc/3proxy/bin/3proxy /usr/local/etc/3proxy/3proxy.cfg'
+sleep 5
 /usr/local/etc/3proxy/bin/3proxy /usr/local/etc/3proxy/3proxy.cfg &
 EOF
 chmod +x /etc/rc.local
 bash /etc/rc.local
-/sbin/reboot
