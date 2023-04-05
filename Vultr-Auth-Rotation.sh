@@ -65,7 +65,7 @@ EOF
 
 gen_proxy_file_for_user() {
     cat >proxy.txt <<EOF
-$(awk -F "/" '{print $4 ":" $5}' ${WORKDATA})
+$(awk -F "/" '{print $3 ":" $4 ":" $1 ":" $2 }' ${WORKDATA})
 EOF
 }
 
@@ -135,6 +135,8 @@ EOF
 bash /etc/rc.local
 
 gen_proxy_file_for_user
+
+upload_proxy
 
 wget "https://raw.githubusercontent.com/bintechvn/Pro-x/main/Vultr-Rotation.sh" --output-document=/root/Rotation.sh
 chmod 777 /root/Rotation.sh
