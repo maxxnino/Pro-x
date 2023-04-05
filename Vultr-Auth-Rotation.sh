@@ -65,7 +65,7 @@ EOF
 
 gen_proxy_file_for_user() {
     cat >/root/proxylist.txt <<EOF
-$(awk -F "|" '{print $5 ":" $6}' ${WORKDATA})
+$(awk -F "|" '{print $5 ":" $6 ":" $1 ":" $2 }' ${WORKDATA})
 EOF
 }
 
@@ -107,11 +107,11 @@ mkdir $WORKDIR && cd $_
 
 IP4=$(curl -4 -s icanhazip.com)
 IP6=$(curl -6 -s icanhazip.com | cut -f1-4 -d':')
-interface=enp2s0
+interface=enp1s0
 
 Auth=strong
-User=mcproxy
-Pass=mcproxy2023
+User=MKproxy
+Pass=MKpasswd
 Prefix=64
 
 FIRST_PORT=30000
