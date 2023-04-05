@@ -106,37 +106,20 @@ WORKDATA="${WORKDIR}/data.txt"
 mkdir $WORKDIR && cd $_
 
 IP4=$(curl -4 -s icanhazip.com)
-checkIP6=$(curl -6 -s icanhazip.com | cut -f1-4 -d':')
-echo "Detected your ipv4: $IP4" 
-echo "Detected your ipv6: $checkIP6" 
-#read -p "What is your ipv6 prefix? (exp: /56, /64): " Prefix
-Prefix=64
-read -p "What is your ipv6 subnet? (exp: 2600:3c00:e002:6d00): " IP6
-checkinterface=$(ip addr show | awk '/inet.*brd/{print $NF}')
-echo "Detected your active interface: $checkinterface"
-read -p "Please confirm your active network interface : " interface
-#interface=eth0
+IP6=$(curl -6 -s icanhazip.com | cut -f1-4 -d':')
+interface=enp2s0
 
-#while true; do
-#    read -p "Do you want to create auth for your proxy? (Y/N): " authConfirm
-#    case $authConfirm in
-#        [Yy]* ) Auth=strong; read -p "Input UserName? " User; read -p "Input PassWord: " Pass; break;;
-#        [Nn]* ) Auth=none;User=minhchau; Pass=minhchau@123; break;;
-#        * ) echo "Please answer yes or no.";;
-#    esac
-#done
 Auth=strong
 User=mcproxy
 Pass=mcproxy2023
+Prefix=64
 
-#read -p "Please input start port :" FIRST_PORT
-#read -p "Please input start port :" LAST_PORT
-FIRST_PORT=40000
-LAST_PORT=40349
+FIRST_PORT=30000
+LAST_PORT=32000
 
 rm -fv $WORKDIR/ipv6-subnet.txt
 cat >>$WORKDIR/ipv6-subnet.txt <<EOF
-${IP6}|${Prefix}|${User}|${Pass}|${interface}|${Auth}|${IP4}|${FIRST_PORT}|${LAST_PORT}
+${IP6}|${Prefix}|${User}|${Pass}|${interface}|${Auth}
 EOF
 
 
@@ -166,13 +149,13 @@ bash /etc/rc.local
 
 gen_proxy_file_for_user
 
-wget "https://raw.githubusercontent.com/minhchau91/createproxy/main/Nocix_Rotation.sh" --output-document=/root/Rotation.sh
+wget "https://raw.githubusercontent.com/minhchau91/createproxy/main/Vultr-Rotation.sh" --output-document=/root/Rotation.sh
 chmod 777 /root/Rotation.sh
 cat >>/var/spool/cron/root<<EOF
 #day - time
-59 7 * * * /root/Rotation.sh > /root/Rotation_log.txt
+#59 7 * * * /root/Rotation.sh > /root/Rotation_log.txt
 #minutes
-#*30 * * * * /root/Rotation.sh > /root/Rotation_log.txt
+*/5 * * * * /root/Rotation.sh > /root/Rotation_log.txt
 #hour
 #0 * * * * /root/Rotation.sh > /root/Rotation_log.txt
 EOF
