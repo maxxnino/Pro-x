@@ -21,7 +21,7 @@ install_3proxy() {
     make -f Makefile.Linux
     mkdir -p /usr/local/etc/3proxy/{bin,logs,stat}
     mv /3proxy/3proxy-0.9.3/bin/3proxy /usr/local/etc/3proxy/bin/
-    wget https://raw.githubusercontent.com/bintechvn/Pro-x/main/3proxy.service-Centos8 --output-document=/3proxy/3proxy-0.9.3/scripts/3proxy.service2
+    wget https://raw.githubusercontent.com/minhchau91/Proxy_ipv6/main/3proxy.service-Centos8 --output-document=/3proxy/3proxy-0.9.3/scripts/3proxy.service2
     cp /3proxy/3proxy-0.9.3/scripts/3proxy.service2 /usr/lib/systemd/system/3proxy.service
     systemctl link /usr/lib/systemd/system/3proxy.service
     systemctl daemon-reload
@@ -55,52 +55,50 @@ setuid 65535
 stacksize 6291456 
 flush
 auth $Auth
-users $(awk -F "/" 'BEGIN{ORS="";} {print $1 ":CL:" $2 " "}' ${WORKDATA})
+users $(awk -F "|" 'BEGIN{ORS="";} {print $1 ":CL:" $2 " "}' ${WORKDATA})
 $(awk -F "|" '{print "auth " $3"\n" \
 "allow " $1 "\n" \
-"proxy -6 -n -a -p" $5 " -i" $4 " -e"$6"\n" \
+"proxy -6 -n -a -p" $6 " -i" $5 " -e"$7"\n" \
 "flush\n"}' ${WORKDATA})
 EOF
 }
 
 gen_proxy_file_for_user() {
-    cat >proxy.txt <<EOF
-$(awk -F "/" '{print $4 ":" $5}' ${WORKDATA})
+    cat >/root/proxylist.txt <<EOF
+$(awk -F "|" '{print $5 ":" $6}' ${WORKDATA})
 EOF
 }
 
 upload_proxy() {
     cd $WORKDIR
-    local PASS=$(random)
-    zip --password $PASS proxy.zip proxy.txt
+    local PASS1=$(random)
+    zip --password $PASS1 proxy.zip /root/proxylist.txt
     URL=$(curl -F "file=@proxy.zip" https://file.io)
 
-    echo "Proxy is ready! Format IP:PORT:LOGIN:PASS"
+    echo "Proxy is ready! Format IP:PORT:LOGIN:PASS1"
     echo "Download zip archive from: ${URL}"
-    echo "Password: ${PASS}"
+    echo "Password: ${PASS1}"
 
 }
 gen_data() {
     seq $FIRST_PORT $LAST_PORT | while read port; do
-        echo "bintechproxy/bintechpass/$interface/$IP4/$port/$(gen64 $IP6)"
+        echo "$User|$Pass|$Auth|$interface|$IP4|$port|$(gen64 $IP6)|$Prefix"
     done
 }
 
 gen_iptables() {
     cat <<EOF
-    $(awk -F "/" '{print "iptables -I INPUT -p tcp --dport " $5 "  -m state --state NEW -j ACCEPT"}' ${WORKDATA}) 
+    $(awk -F "|" '{print "iptables -I INPUT -p tcp --dport " $6 "  -m state --state NEW -j ACCEPT"}' ${WORKDATA}) 
 EOF
 }
 
 gen_ifconfig() {
     cat <<EOF
-$(awk -F "/" '{print "ifconfig " $3 " inet6 add " $6 "/64"}' ${WORKDATA})
+$(awk -F "|" '{print "ifconfig " $4 " inet6 add " $7"/"$8}' ${WORKDATA})
 EOF
 }
 echo "installing apps"
 yum -y install gcc net-tools bsdtar zip make >/dev/null
-
-install_3proxy
 
 echo "working folder = /home/proxy-installer"
 WORKDIR="/home/proxy-installer"
@@ -109,12 +107,27 @@ mkdir $WORKDIR && cd $_
 
 IP4=$(curl -4 -s icanhazip.com)
 IP6=$(curl -6 -s icanhazip.com | cut -f1-4 -d':')
-interface=$(ip addr show | awk '/inet.*brd/{print $NF}')
+interface=enp2s0
+
+Auth=strong
+User=mcproxy
+Pass=mcproxy2023
+Prefix=64
+
+FIRST_PORT=40000
+LAST_PORT=41099
+
+rm -fv $WORKDIR/ipv6-subnet.txt
+cat >>$WORKDIR/ipv6-subnet.txt <<EOF
+${IP6}|${Prefix}|${User}|${Pass}|${interface}|${Auth}
+EOF
+
+
+install_3proxy
 
 echo "Internal ip = ${IP4}. Exteranl sub for ip6 = ${IP6}"
 
-FIRST_PORT=30000
-LAST_PORT=33000
+
 
 gen_data >$WORKDIR/data.txt
 gen_iptables >$WORKDIR/boot_iptables.sh
@@ -136,13 +149,13 @@ bash /etc/rc.local
 
 gen_proxy_file_for_user
 
-wget "https://raw.githubusercontent.com/bintechvn/Pro-x/main/Rotation.sh" --output-document=/root/Rotation.sh
+wget "https://raw.githubusercontent.com/minhchau91/createproxy/main/Rotation.sh" --output-document=/root/Rotation.sh
 chmod 777 /root/Rotation.sh
 cat >>/var/spool/cron/root<<EOF
 #day - time
-#59 7 * * * /root/Rotation.sh > /root/Rotation_log.txt
+59 7 * * * /root/Rotation.sh > /root/Rotation_log.txt
 #minutes
-*/5 * * * * /root/Rotation.sh > /root/Rotation_log.txt
+#*/5 * * * * /root/Rotation.sh > /root/Rotation_log.txt
 #hour
 #0 * * * * /root/Rotation.sh > /root/Rotation_log.txt
 EOF
